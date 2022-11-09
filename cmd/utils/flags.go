@@ -31,6 +31,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	builder "github.com/ethereum/go-ethereum/builder"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/fdlimit"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -43,6 +44,7 @@ import (
 	ethcatalyst "github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/eth/gasprice"
 	"github.com/ethereum/go-ethereum/eth/tracers"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -64,6 +66,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rpc"
 	pcsclite "github.com/gballet/go-libpcsclite"
 	gopsutil "github.com/shirou/gopsutil/mem"
 	"github.com/urfave/cli/v2"
@@ -91,7 +94,7 @@ var (
 	}
 	AncientFlag = &flags.DirectoryFlag{
 		Name:     "datadir.ancient",
-		Usage:    "Data directory for ancient chain segments (default = inside chaindata)",
+		Usage:    "Root directory for ancient data (default = inside chaindata)",
 		Category: flags.EthCategory,
 	}
 	MinFreeDiskSpaceFlag = &flags.DirectoryFlag{
@@ -262,17 +265,16 @@ var (
 		Value:    2048,
 		Category: flags.EthCategory,
 	}
-	OverrideGrayGlacierFlag = &cli.Uint64Flag{
-		Name:     "override.grayglacier",
-		Usage:    "Manually specify Gray Glacier fork-block, overriding the bundled setting",
-		Category: flags.EthCategory,
-	}
 	OverrideTerminalTotalDifficulty = &flags.BigFlag{
 		Name:     "override.terminaltotaldifficulty",
 		Usage:    "Manually specify TerminalTotalDifficulty, overriding the bundled setting",
 		Category: flags.EthCategory,
 	}
-
+	OverrideTerminalTotalDifficultyPassed = &cli.BoolFlag{
+		Name:     "override.terminaltotaldifficultypassed",
+		Usage:    "Manually specify TerminalTotalDifficultyPassed, overriding the bundled setting",
+		Category: flags.EthCategory,
+	}
 	// Light server and client settings
 	LightServeFlag = &cli.IntFlag{
 		Name:     "light.serve",
@@ -497,6 +499,12 @@ var (
 		Usage:    "Enable recording the SHA3/keccak preimages of trie keys",
 		Category: flags.PerfCategory,
 	}
+	CacheLogSizeFlag = &cli.IntFlag{
+		Name:     "cache.blocklogs",
+		Usage:    "Size (in number of blocks) of the log cache for filtering",
+		Category: flags.PerfCategory,
+		Value:    ethconfig.Defaults.FilterLogCacheSize,
+	}
 	FDLimitFlag = &cli.IntFlag{
 		Name:     "fdlimit",
 		Usage:    "Raise the open file descriptor resource limit (default = system fd limit)",
@@ -668,7 +676,67 @@ var (
 		Usage:    "Geth will start up even if there are legacy receipts in freezer",
 		Category: flags.MiscCategory,
 	}
-
+	// Builder API settings
+	BuilderEnabled = &cli.BoolFlag{
+		Name:  "builder",
+		Usage: "Enable the builder",
+	}
+	BuilderEnableValidatorChecks = &cli.BoolFlag{
+		Name:  "builder.validator_checks",
+		Usage: "Enable the validator checks",
+	}
+	BuilderEnableLocalRelay = &cli.BoolFlag{
+		Name:  "builder.local_relay",
+		Usage: "Enable the local relay",
+	}
+	BuilderSecretKey = &cli.StringFlag{
+		Name:    "builder.secret_key",
+		Usage:   "Builder key used for signing blocks",
+		EnvVars: []string{"BUILDER_SECRET_KEY"},
+		Value:   "0x2fc12ae741f29701f8e30f5de6350766c020cb80768a0ff01e6838ffd2431e11",
+	}
+	BuilderRelaySecretKey = &cli.StringFlag{
+		Name:    "builder.relay_secret_key",
+		Usage:   "Builder local relay API key used for signing headers",
+		EnvVars: []string{"BUILDER_RELAY_SECRET_KEY"},
+		Value:   "0x2fc12ae741f29701f8e30f5de6350766c020cb80768a0ff01e6838ffd2431e11",
+	}
+	BuilderListenAddr = &cli.StringFlag{
+		Name:    "builder.listen_addr",
+		Usage:   "Listening address for builder endpoint",
+		EnvVars: []string{"BUILDER_LISTEN_ADDR"},
+		Value:   ":28545",
+	}
+	BuilderGenesisForkVersion = &cli.StringFlag{
+		Name:    "builder.genesis_fork_version",
+		Usage:   "Gensis fork version. For kiln use 0x70000069",
+		EnvVars: []string{"BUILDER_GENESIS_FORK_VERSION"},
+		Value:   "0x00000000",
+	}
+	BuilderBellatrixForkVersion = &cli.StringFlag{
+		Name:    "builder.bellatrix_fork_version",
+		Usage:   "Bellatrix fork version. For kiln use 0x70000071",
+		EnvVars: []string{"BUILDER_BELLATRIX_FORK_VERSION"},
+		Value:   "0x02000000",
+	}
+	BuilderGenesisValidatorsRoot = &cli.StringFlag{
+		Name:    "builder.genesis_validators_root",
+		Usage:   "Genesis validators root of the network. For kiln use 0x99b09fcd43e5905236c370f184056bec6e6638cfc31a323b304fc4aa789cb4ad",
+		EnvVars: []string{"BUILDER_GENESIS_VALIDATORS_ROOT"},
+		Value:   "0x0000000000000000000000000000000000000000000000000000000000000000",
+	}
+	BuilderBeaconEndpoint = &cli.StringFlag{
+		Name:    "builder.beacon_endpoint",
+		Usage:   "Beacon endpoint to connect to for beacon chain data",
+		EnvVars: []string{"BUILDER_BEACON_ENDPOINT"},
+		Value:   "http://127.0.0.1:5052",
+	}
+	BuilderRemoteRelayEndpoint = &cli.StringFlag{
+		Name:    "builder.remote_relay_endpoint",
+		Usage:   "Relay endpoint to connect to for validator registration data, if not provided will expose validator registration locally",
+		EnvVars: []string{"BUILDER_REMOTE_RELAY_ENDPOINT"},
+		Value:   "",
+	}
 	// RPC settings
 	IPCDisabledFlag = &cli.BoolFlag{
 		Name:     "ipcdisable",
@@ -1848,6 +1916,9 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	if ctx.IsSet(CacheFlag.Name) || ctx.IsSet(CacheSnapshotFlag.Name) {
 		cfg.SnapshotCache = ctx.Int(CacheFlag.Name) * ctx.Int(CacheSnapshotFlag.Name) / 100
 	}
+	if ctx.IsSet(CacheLogSizeFlag.Name) {
+		cfg.FilterLogCacheSize = ctx.Int(CacheLogSizeFlag.Name)
+	}
 	if !ctx.Bool(SnapshotFlag.Name) {
 		// If snap-sync is requested, this flag is also required
 		if cfg.SyncMode == downloader.SnapSync {
@@ -2016,7 +2087,7 @@ func SetDNSDiscoveryDefaults(cfg *ethconfig.Config, genesis common.Hash) {
 // RegisterEthService adds an Ethereum client to the stack.
 // The second return value is the full node instance, which may be nil if the
 // node is running as a light client.
-func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend, *eth.Ethereum) {
+func RegisterEthService(stack *node.Node, cfg *ethconfig.Config, bpCfg *builder.BuilderConfig) (ethapi.Backend, *eth.Ethereum) {
 	if cfg.SyncMode == downloader.LightSync {
 		backend, err := les.New(stack, cfg)
 		if err != nil {
@@ -2041,23 +2112,43 @@ func RegisterEthService(stack *node.Node, cfg *ethconfig.Config) (ethapi.Backend
 	if err := ethcatalyst.Register(stack, backend); err != nil {
 		Fatalf("Failed to register the Engine API service: %v", err)
 	}
+
+	if bpCfg.Enabled {
+		if err := builder.Register(stack, backend, bpCfg); err != nil {
+			Fatalf("Failed to register the builder service: %v", err)
+		}
+	}
+
 	stack.RegisterAPIs(tracers.APIs(backend.APIBackend))
 	return backend.APIBackend, backend
 }
 
-// RegisterEthStatsService configures the Ethereum Stats daemon and adds it to
-// the given node.
+// RegisterEthStatsService configures the Ethereum Stats daemon and adds it to the node.
 func RegisterEthStatsService(stack *node.Node, backend ethapi.Backend, url string) {
 	if err := ethstats.New(stack, backend, backend.Engine(), url); err != nil {
 		Fatalf("Failed to register the Ethereum Stats service: %v", err)
 	}
 }
 
-// RegisterGraphQLService is a utility function to construct a new service and register it against a node.
-func RegisterGraphQLService(stack *node.Node, backend ethapi.Backend, cfg node.Config) {
-	if err := graphql.New(stack, backend, cfg.GraphQLCors, cfg.GraphQLVirtualHosts); err != nil {
+// RegisterGraphQLService adds the GraphQL API to the node.
+func RegisterGraphQLService(stack *node.Node, backend ethapi.Backend, filterSystem *filters.FilterSystem, cfg *node.Config) {
+	err := graphql.New(stack, backend, filterSystem, cfg.GraphQLCors, cfg.GraphQLVirtualHosts)
+	if err != nil {
 		Fatalf("Failed to register the GraphQL service: %v", err)
 	}
+}
+
+// RegisterFilterAPI adds the eth log filtering RPC API to the node.
+func RegisterFilterAPI(stack *node.Node, backend ethapi.Backend, ethcfg *ethconfig.Config) *filters.FilterSystem {
+	isLightClient := ethcfg.SyncMode == downloader.LightSync
+	filterSystem := filters.NewFilterSystem(backend, filters.Config{
+		LogCacheSize: ethcfg.FilterLogCacheSize,
+	})
+	stack.RegisterAPIs([]rpc.API{{
+		Namespace: "eth",
+		Service:   filters.NewFilterAPI(filterSystem, isLightClient),
+	}})
+	return filterSystem
 }
 
 func SetupMetrics(ctx *cli.Context) {

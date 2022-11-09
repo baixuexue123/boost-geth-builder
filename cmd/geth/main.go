@@ -69,8 +69,8 @@ var (
 		utils.NoUSBFlag,
 		utils.USBFlag,
 		utils.SmartCardDaemonPathFlag,
-		utils.OverrideGrayGlacierFlag,
 		utils.OverrideTerminalTotalDifficulty,
+		utils.OverrideTerminalTotalDifficultyPassed,
 		utils.EthashCacheDirFlag,
 		utils.EthashCachesInMemoryFlag,
 		utils.EthashCachesOnDiskFlag,
@@ -118,6 +118,7 @@ var (
 		utils.CacheSnapshotFlag,
 		utils.CacheNoPrefetchFlag,
 		utils.CachePreimagesFlag,
+		utils.CacheLogSizeFlag,
 		utils.FDLimitFlag,
 		utils.ListenPortFlag,
 		utils.DiscoveryPortFlag,
@@ -158,6 +159,20 @@ var (
 		utils.IgnoreLegacyReceiptsFlag,
 		configFileFlag,
 	}, utils.NetworkFlags, utils.DatabasePathFlags)
+
+	builderApiFlags = []cli.Flag{
+		utils.BuilderEnabled,
+		utils.BuilderEnableValidatorChecks,
+		utils.BuilderEnableLocalRelay,
+		utils.BuilderSecretKey,
+		utils.BuilderRelaySecretKey,
+		utils.BuilderListenAddr,
+		utils.BuilderGenesisForkVersion,
+		utils.BuilderBellatrixForkVersion,
+		utils.BuilderGenesisValidatorsRoot,
+		utils.BuilderBeaconEndpoint,
+		utils.BuilderRemoteRelayEndpoint,
+	}
 
 	rpcFlags = []cli.Flag{
 		utils.HTTPEnabledFlag,
@@ -249,6 +264,7 @@ func init() {
 	app.Flags = flags.Merge(
 		nodeFlags,
 		rpcFlags,
+		builderApiFlags,
 		consoleFlags,
 		debug.Flags,
 		metricsFlags,

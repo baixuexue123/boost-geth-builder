@@ -18,6 +18,7 @@
 package miner
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"sync"
@@ -44,15 +45,16 @@ type Backend interface {
 
 // Config is the configuration parameters of mining.
 type Config struct {
-	Etherbase        common.Address `toml:",omitempty"` // Public address for block mining rewards (default = first account)
-	Notify           []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages (only useful in ethash).
-	NotifyFull       bool           `toml:",omitempty"` // Notify with pending block headers instead of work packages
-	ExtraData        hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
-	GasFloor         uint64         // Target gas floor for mined blocks.
-	GasCeil          uint64         // Target gas ceiling for mined blocks.
-	GasPrice         *big.Int       // Minimum gas price for mining a transaction
-	Recommit         time.Duration  // The time interval for miner to re-create mining work.
-	Noverify         bool           // Disable remote mining solution verification(only useful in ethash).
+	Etherbase           common.Address    `toml:",omitempty"` // Public address for block mining rewards (default = first account)
+	Notify              []string          `toml:",omitempty"` // HTTP URL list to be notified of new work packages (only useful in ethash).
+	NotifyFull          bool              `toml:",omitempty"` // Notify with pending block headers instead of work packages
+	ExtraData           hexutil.Bytes     `toml:",omitempty"` // Block extra data set by the miner
+	GasFloor            uint64            // Target gas floor for mined blocks.
+	GasCeil             uint64            // Target gas ceiling for mined blocks.
+	GasPrice            *big.Int          // Minimum gas price for mining a transaction
+	Recommit            time.Duration     // The time interval for miner to re-create mining work.
+	Noverify            bool              // Disable remote mining solution verification(only useful in ethash).
+	BuilderTxSigningKey *ecdsa.PrivateKey // Signing key of builder coinbase to make transaction to validator
 	MaxMergedBundles int
 	TrustedRelays    []common.Address `toml:",omitempty"` // Trusted relay addresses to receive tasks from.
 }
@@ -247,8 +249,8 @@ func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscript
 // there is always a result that will be returned through the result channel.
 // The difference is that if the execution fails, the returned result is nil
 // and the concrete error is dropped silently.
-func (miner *Miner) GetSealingBlockAsync(parent common.Hash, timestamp uint64, coinbase common.Address, random common.Hash, noTxs bool) (chan *types.Block, error) {
-	resCh, _, err := miner.worker.regularWorker.getSealingBlock(parent, timestamp, coinbase, random, noTxs)
+func (miner *Miner) GetSealingBlockAsync(parent common.Hash, timestamp uint64, coinbase common.Address, gasLimit uint64, random common.Hash, noTxs bool) (chan *types.Block, error) {
+	resCh, _, err := miner.worker.regularWorker.getSealingBlock(parent, timestamp, coinbase, gasLimit, random, noTxs, false)
 	if err != nil {
 		return nil, err
 	}
@@ -258,8 +260,8 @@ func (miner *Miner) GetSealingBlockAsync(parent common.Hash, timestamp uint64, c
 // GetSealingBlockSync creates a sealing block according to the given parameters.
 // If the generation is failed or the underlying work is already closed, an error
 // will be returned.
-func (miner *Miner) GetSealingBlockSync(parent common.Hash, timestamp uint64, coinbase common.Address, random common.Hash, noTxs bool) (*types.Block, error) {
-	resCh, errCh, err := miner.worker.regularWorker.getSealingBlock(parent, timestamp, coinbase, random, noTxs)
+func (miner *Miner) GetSealingBlockSync(parent common.Hash, timestamp uint64, coinbase common.Address, gasLimit uint64, random common.Hash, noTxs bool) (*types.Block, error) {
+	resCh, errCh, err := miner.worker.regularWorker.getSealingBlock(parent, timestamp, coinbase, gasLimit, random, noTxs, false)
 	if err != nil {
 		return nil, err
 	}

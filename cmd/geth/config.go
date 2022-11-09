@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"reflect"
 	"unicode"
@@ -31,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/accounts/scwallet"
 	"github.com/ethereum/go-ethereum/accounts/usbwallet"
+	builder "github.com/ethereum/go-ethereum/builder"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
@@ -157,13 +157,31 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 // makeFullNode loads geth configuration and creates the Ethereum backend.
 func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	stack, cfg := makeConfigNode(ctx)
-	if ctx.IsSet(utils.OverrideGrayGlacierFlag.Name) {
-		cfg.Eth.OverrideGrayGlacier = new(big.Int).SetUint64(ctx.Uint64(utils.OverrideGrayGlacierFlag.Name))
-	}
 	if ctx.IsSet(utils.OverrideTerminalTotalDifficulty.Name) {
 		cfg.Eth.OverrideTerminalTotalDifficulty = flags.GlobalBig(ctx, utils.OverrideTerminalTotalDifficulty.Name)
 	}
-	backend, eth := utils.RegisterEthService(stack, &cfg.Eth)
+
+	if ctx.IsSet(utils.OverrideTerminalTotalDifficultyPassed.Name) {
+		override := ctx.Bool(utils.OverrideTerminalTotalDifficultyPassed.Name)
+		cfg.Eth.OverrideTerminalTotalDifficultyPassed = &override
+	}
+
+	bpConfig := &builder.BuilderConfig{
+		Enabled:               ctx.IsSet(utils.BuilderEnabled.Name),
+		EnableValidatorChecks: ctx.IsSet(utils.BuilderEnableValidatorChecks.Name),
+		EnableLocalRelay:      ctx.IsSet(utils.BuilderEnableLocalRelay.Name),
+		BuilderSecretKey:      ctx.String(utils.BuilderSecretKey.Name),
+		RelaySecretKey:        ctx.String(utils.BuilderRelaySecretKey.Name),
+		ListenAddr:            ctx.String(utils.BuilderListenAddr.Name),
+		GenesisForkVersion:    ctx.String(utils.BuilderGenesisForkVersion.Name),
+		BellatrixForkVersion:  ctx.String(utils.BuilderBellatrixForkVersion.Name),
+		GenesisValidatorsRoot: ctx.String(utils.BuilderGenesisValidatorsRoot.Name),
+		BeaconEndpoint:        ctx.String(utils.BuilderBeaconEndpoint.Name),
+		RemoteRelayEndpoint:   ctx.String(utils.BuilderRemoteRelayEndpoint.Name),
+	}
+
+	backend, eth := utils.RegisterEthService(stack, &cfg.Eth, bpConfig)
+
 	// Warn users to migrate if they have a legacy freezer format.
 	if eth != nil && !ctx.IsSet(utils.IgnoreLegacyReceiptsFlag.Name) {
 		firstIdx := uint64(0)
@@ -182,10 +200,14 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 		}
 	}
 
-	// Configure GraphQL if requested
+	// Configure log filter RPC API.
+	filterSystem := utils.RegisterFilterAPI(stack, backend, &cfg.Eth)
+
+	// Configure GraphQL if requested.
 	if ctx.IsSet(utils.GraphQLEnabledFlag.Name) {
-		utils.RegisterGraphQLService(stack, backend, cfg.Node)
+		utils.RegisterGraphQLService(stack, backend, filterSystem, &cfg.Node)
 	}
+
 	// Add the Ethereum Stats daemon if requested.
 	if cfg.Ethstats.URL != "" {
 		utils.RegisterEthStatsService(stack, backend, cfg.Ethstats.URL)
