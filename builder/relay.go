@@ -140,7 +140,7 @@ func (r *RemoteRelay) GetValidatorForSlot(nextSlot uint64) (ValidatorData, error
 }
 
 func (r *RemoteRelay) SubmitBlock(msg *boostTypes.BuilderSubmitBlockRequest) error {
-	code, err := server.SendHTTPRequest(context.TODO(), *http.DefaultClient, http.MethodPost, r.endpoint+"/relay/v1/builder/blocks", msg, nil)
+	code, err := server.SendHTTPRequest(context.TODO(), *http.DefaultClient, http.MethodPost, r.endpoint+"/relay/v1/builder/blocks", "", msg, nil)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func (r *RemoteRelay) SubmitBlock(msg *boostTypes.BuilderSubmitBlockRequest) err
 
 func (r *RemoteRelay) getSlotValidatorMapFromRelay() (map[uint64]ValidatorData, error) {
 	var dst GetValidatorRelayResponse
-	code, err := server.SendHTTPRequest(context.TODO(), *http.DefaultClient, http.MethodGet, r.endpoint+"/relay/v1/builder/validators", nil, &dst)
+	code, err := server.SendHTTPRequest(context.TODO(), *http.DefaultClient, http.MethodGet, r.endpoint+"/relay/v1/builder/validators", "", nil, &dst)
 	if err != nil {
 		return nil, err
 	}
