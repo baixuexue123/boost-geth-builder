@@ -55,12 +55,14 @@ type Config struct {
 	Recommit            time.Duration     // The time interval for miner to re-create mining work.
 	Noverify            bool              // Disable remote mining solution verification(only useful in ethash).
 	BuilderTxSigningKey *ecdsa.PrivateKey // Signing key of builder coinbase to make transaction to validator
+	MaxMergedBundles int
+	TrustedRelays    []common.Address `toml:",omitempty"` // Trusted relay addresses to receive tasks from.
 }
 
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
 	mux      *event.TypeMux
-	worker   *worker
+	worker   *multiWorker
 	coinbase common.Address
 	eth      Backend
 	engine   consensus.Engine
@@ -79,7 +81,7 @@ func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *even
 		exitCh:  make(chan struct{}),
 		startCh: make(chan common.Address),
 		stopCh:  make(chan struct{}),
-		worker:  newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true),
+		worker:  newMultiWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true),
 	}
 	miner.wg.Add(1)
 	go miner.update()
@@ -191,7 +193,7 @@ func (miner *Miner) SetRecommitInterval(interval time.Duration) {
 
 // Pending returns the currently pending block and associated state.
 func (miner *Miner) Pending() (*types.Block, *state.StateDB) {
-	return miner.worker.pending()
+	return miner.worker.regularWorker.pending()
 }
 
 // PendingBlock returns the currently pending block.
@@ -200,7 +202,7 @@ func (miner *Miner) Pending() (*types.Block, *state.StateDB) {
 // simultaneously, please use Pending(), as the pending state can
 // change between multiple method calls
 func (miner *Miner) PendingBlock() *types.Block {
-	return miner.worker.pendingBlock()
+	return miner.worker.regularWorker.pendingBlock()
 }
 
 // PendingBlockAndReceipts returns the currently pending block and corresponding receipts.
@@ -239,7 +241,7 @@ func (miner *Miner) DisablePreseal() {
 // SubscribePendingLogs starts delivering logs from pending transactions
 // to the given channel.
 func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
-	return miner.worker.pendingLogsFeed.Subscribe(ch)
+	return miner.worker.regularWorker.pendingLogsFeed.Subscribe(ch)
 }
 
 // GetSealingBlockAsync requests to generate a sealing block according to the
@@ -247,8 +249,8 @@ func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscript
 // there is always a result that will be returned through the result channel.
 // The difference is that if the execution fails, the returned result is nil
 // and the concrete error is dropped silently.
-func (miner *Miner) GetSealingBlockAsync(parent common.Hash, timestamp uint64, coinbase common.Address, gasLimit uint64, random common.Hash, noTxs bool) (chan *types.Block, error) {
-	resCh, _, err := miner.worker.getSealingBlock(parent, timestamp, coinbase, gasLimit, random, noTxs, false)
+func (miner *Miner) GetSealingBlockAsync(parent common.Hash, timestamp uint64, coinbase common.Address, random common.Hash, noTxs bool) (chan *types.Block, error) {
+	resCh, _, err := miner.worker.regularWorker.getSealingBlock(parent, timestamp, coinbase, random, noTxs)
 	if err != nil {
 		return nil, err
 	}
@@ -258,8 +260,8 @@ func (miner *Miner) GetSealingBlockAsync(parent common.Hash, timestamp uint64, c
 // GetSealingBlockSync creates a sealing block according to the given parameters.
 // If the generation is failed or the underlying work is already closed, an error
 // will be returned.
-func (miner *Miner) GetSealingBlockSync(parent common.Hash, timestamp uint64, coinbase common.Address, gasLimit uint64, random common.Hash, noTxs bool) (*types.Block, error) {
-	resCh, errCh, err := miner.worker.getSealingBlock(parent, timestamp, coinbase, gasLimit, random, noTxs, false)
+func (miner *Miner) GetSealingBlockSync(parent common.Hash, timestamp uint64, coinbase common.Address, random common.Hash, noTxs bool) (*types.Block, error) {
+	resCh, errCh, err := miner.worker.regularWorker.getSealingBlock(parent, timestamp, coinbase, random, noTxs)
 	if err != nil {
 		return nil, err
 	}
