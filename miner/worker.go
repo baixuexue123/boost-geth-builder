@@ -23,8 +23,8 @@ import (
 	"math/big"
 
 	"os"
-	"strings"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1483,7 +1483,7 @@ func (w *worker) commitWork(interrupt *int32, noempty bool, timestamp int64) {
 	}
 
 	// Fill pending transactions from the txpool
-	err = w.fillTransactions(interrupt, work)
+	err = w.fillTransactions(interrupt, work, nil)
 	if err != nil && !errors.Is(err, errBlockInterruptedByRecommit) {
 		work.discard()
 		return
