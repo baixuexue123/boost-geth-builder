@@ -23,8 +23,8 @@ import (
 	"math/big"
 
 	"os"
-	"strings"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -271,7 +271,7 @@ type worker struct {
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(header *types.Header) bool, init bool) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(header *types.Header) bool, init bool, flashbots *flashbotsData) *worker {
 	var err error
 	var builderCoinbase common.Address
 	key := os.Getenv("BUILDER_TX_SIGNING_KEY") // get builder private signing key
@@ -340,8 +340,8 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		newMegabundleCh:    make(chan *types.MevBundle),
 		resubmitIntervalCh: make(chan time.Duration),
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
-		coinbase:           builderCoinbase,
 		flashbots:          flashbots,
+		coinbase:           builderCoinbase,
 	}
 
 	// Subscribe NewTxsEvent for tx pool
