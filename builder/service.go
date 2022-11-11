@@ -163,7 +163,8 @@ func Register(stack *node.Node, backend *eth.Ethereum, cfg *BuilderConfig) error
 	builderService := NewService(cfg.ListenAddr, localRelay, builderBackend)
 	builderService.Start()
 
-	log.Info("builder service listen at", cfg.ListenAddr)
+	log.Info(cfg.ListenAddr)
+	log.Info("builder service listen at", "ListenAddr", cfg.ListenAddr)
 
 	stack.RegisterAPIs([]rpc.API{
 		{
