@@ -1275,7 +1275,6 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 // fillTransactions retrieves the pending transactions from the txpool and fills them
 // into the given sealing block. The transaction selection and ordering strategy can
 // be customized with the plugin in the future.
-
 func (w *worker) fillTransactions(interrupt *int32, env *environment, validatorCoinbase *common.Address) error {
 	// Split the pending transactions into locals and remotes
 	// Fill the block with all available pending transactions.
@@ -1367,7 +1366,11 @@ func (w *worker) fillTransactions(interrupt *int32, env *environment, validatorC
 	}
 	if validatorCoinbase != nil && w.config.BuilderTxSigningKey != nil {
 		builderCoinbaseBalanceAfter := env.state.GetBalance(w.coinbase)
-		log.Info("Before creating validator profit", "validatorCoinbase", validatorCoinbase.String(), "builderCoinbase", w.coinbase.String(), "builderCoinbaseBalanceBefore", builderCoinbaseBalanceBefore.String(), "builderCoinbaseBalanceAfter", builderCoinbaseBalanceAfter.String())
+		log.Info("Before creating validator profit",
+			"validatorCoinbase", validatorCoinbase.String(),
+			"builderCoinbase", w.coinbase.String(),
+			"builderCoinbaseBalanceBefore", builderCoinbaseBalanceBefore.String(),
+			"builderCoinbaseBalanceAfter", builderCoinbaseBalanceAfter.String())
 
 		profit := new(big.Int).Sub(builderCoinbaseBalanceAfter, builderCoinbaseBalanceBefore)
 		env.gasPool.AddGas(paymentTxGas)
@@ -1394,7 +1397,6 @@ func (w *worker) fillTransactions(interrupt *int32, env *environment, validatorC
 			log.Warn("Proposer payout create tx failed due to not enough balance", "profit", profit.String())
 			return errors.New("proposer payout create tx failed due to not enough balance")
 		}
-
 	}
 	return nil
 }

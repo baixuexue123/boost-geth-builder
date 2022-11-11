@@ -163,9 +163,6 @@ func Register(stack *node.Node, backend *eth.Ethereum, cfg *BuilderConfig) error
 	builderService := NewService(cfg.ListenAddr, localRelay, builderBackend)
 	builderService.Start()
 
-	log.Info(cfg.ListenAddr)
-	log.Info("builder service listen at", "ListenAddr", cfg.ListenAddr)
-
 	stack.RegisterAPIs([]rpc.API{
 		{
 			Namespace:     "builder",
@@ -175,7 +172,5 @@ func Register(stack *node.Node, backend *eth.Ethereum, cfg *BuilderConfig) error
 			Authenticated: true,
 		},
 	})
-
-	log.Info("builder service started and registered")
 	return nil
 }
