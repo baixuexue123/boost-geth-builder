@@ -148,7 +148,20 @@ func (r *RemoteRelay) SubmitBlock(msg *boostTypes.BuilderSubmitBlockRequest) err
 		return fmt.Errorf("non-ok response code %d from relay ", code)
 	}
 
-	log.Info("submitted block", "msg", msg)
+	payload := msg.ExecutionPayload
+	log.Info("submitted block",
+		"message", *msg.Message,
+		"ParentHash", payload.ParentHash,
+		"FeeRecipient", payload.FeeRecipient,
+		"Random", payload.Random,
+		"BlockNumber", payload.BlockNumber,
+		"GasLimit", payload.GasLimit,
+		"BlockHash", payload.BlockHash,
+		"GasUsed", payload.GasUsed,
+		"Timestamp", payload.Timestamp,
+		"ExtraData", payload.ExtraData,
+		"BaseFeePerGas", payload.BaseFeePerGas,
+		"Transactions", len(payload.Transactions))
 
 	if r.localRelay != nil {
 		r.localRelay.SubmitBlock(msg)
