@@ -582,7 +582,7 @@ func (pool *TxPool) Pending(enforceTips bool) map[common.Address]types.Transacti
 	return pending
 }
 
-/// AllMevBundles returns all the MEV Bundles currently in the pool
+// AllMevBundles returns all the MEV Bundles currently in the pool
 func (pool *TxPool) AllMevBundles() []types.MevBundle {
 	return pool.mevBundles
 }
@@ -632,6 +632,11 @@ func (pool *TxPool) AddMevBundle(txs types.Transactions, blockNumber *big.Int, m
 		MaxTimestamp:      maxTimestamp,
 		RevertingTxHashes: revertingTxHashes,
 	})
+	txHashes := make([]string, len(txs))
+	for i, tx := range txs {
+		txHashes[i] = tx.Hash().Hex()
+	}
+	log.Info("AddMevBundle", "txHashes", txHashes, "blockNumber", blockNumber, "maxTimestamp", maxTimestamp, "mevBundles", len(pool.mevBundles))
 	return nil
 }
 
