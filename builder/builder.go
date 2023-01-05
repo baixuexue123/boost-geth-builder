@@ -164,7 +164,7 @@ func (b *Builder) OnPayloadAttribute(attrs *BuilderPayloadAttributes) error {
 func executableDataToExecutionPayload(data *beacon.ExecutableDataV1) (*boostTypes.ExecutionPayload, error) {
 	transactionData := make([]hexutil.Bytes, len(data.Transactions))
 	for i, tx := range data.Transactions {
-		transactionData[i] = hexutil.Bytes(tx)
+		transactionData[i] = tx
 	}
 
 	baseFeePerGas := new(boostTypes.U256Str)

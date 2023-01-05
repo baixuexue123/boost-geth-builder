@@ -1366,13 +1366,14 @@ func (w *worker) fillTransactions(interrupt *int32, env *environment, validatorC
 	}
 	if validatorCoinbase != nil && w.config.BuilderTxSigningKey != nil {
 		builderCoinbaseBalanceAfter := env.state.GetBalance(w.coinbase)
+		profit := new(big.Int).Sub(builderCoinbaseBalanceAfter, builderCoinbaseBalanceBefore)
 		log.Info("Before creating validator profit",
 			"validatorCoinbase", validatorCoinbase.String(),
 			"builderCoinbase", w.coinbase.String(),
 			"builderCoinbaseBalanceBefore", builderCoinbaseBalanceBefore.String(),
-			"builderCoinbaseBalanceAfter", builderCoinbaseBalanceAfter.String())
+			"builderCoinbaseBalanceAfter", builderCoinbaseBalanceAfter.String(),
+			"profit", profit.String())
 
-		profit := new(big.Int).Sub(builderCoinbaseBalanceAfter, builderCoinbaseBalanceBefore)
 		env.gasPool.AddGas(paymentTxGas)
 		if profit.Sign() == 1 {
 			tx, err := w.createProposerPayoutTx(env, validatorCoinbase, profit)
@@ -1625,7 +1626,17 @@ func (w *worker) mergeBundles(env *environment, bundles []simulatedBundle, pendi
 			continue
 		}
 
-		log.Info("Included bundle", "ethToCoinbase", ethIntToFloat(simmed.totalEth), "gasUsed", simmed.totalGasUsed, "bundleScore", simmed.mevGasPrice, "bundleLength", len(simmed.originalBundle.Txs), "worker", w.flashbots.maxMergedBundles)
+		txHashes := make([]string, len(simmed.originalBundle.Txs))
+		for i, tx := range simmed.originalBundle.Txs {
+			txHashes[i] = strings.ToLower(tx.Hash().Hex())
+		}
+		log.Info("Included bundle",
+			"ethToCoinbase", ethIntToFloat(simmed.totalEth),
+			"gasUsed", simmed.totalGasUsed,
+			"bundleScore", simmed.mevGasPrice,
+			"bundleLength", len(simmed.originalBundle.Txs),
+			"worker", w.flashbots.maxMergedBundles,
+			"txs", strings.Join(txHashes, ","))
 
 		finalBundle = append(finalBundle, bundle.originalBundle.Txs...)
 		mergedBundle.totalEth.Add(mergedBundle.totalEth, simmed.totalEth)
