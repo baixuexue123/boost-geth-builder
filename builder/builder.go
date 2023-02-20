@@ -241,7 +241,7 @@ func (b *Builder) runBuildingJob(slotCtx context.Context, proposerPubkey boostTy
 		queueBestEntry         blockQueueEntry
 	)
 
-	log.Debug("runBuildingJob", "slot", attrs.Slot, "parent", attrs.HeadHash)
+	log.Info("runBuildingJob", "slot", attrs.Slot, "parent", attrs.HeadHash)
 
 	submitBestBlock := func() {
 		queueMu.Lock()
@@ -288,7 +288,7 @@ func (b *Builder) runBuildingJob(slotCtx context.Context, proposerPubkey boostTy
 
 	// resubmits block builder requests every second
 	runRetryLoop(ctx, 500*time.Millisecond, func() {
-		log.Debug("retrying BuildBlock", "slot", attrs.Slot, "parent", attrs.HeadHash)
+		log.Info("retrying BuildBlock", "slot", attrs.Slot, "parent", attrs.HeadHash)
 		err := b.eth.BuildBlock(attrs, blockHook)
 		if err != nil {
 			log.Warn("Failed to build block", "err", err)

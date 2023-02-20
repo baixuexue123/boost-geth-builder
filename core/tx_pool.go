@@ -739,6 +739,15 @@ func (pool *TxPool) AddMevBundle(txs types.Transactions, blockNumber *big.Int, r
 		RevertingTxHashes: revertingTxHashes,
 		Hash:              bundleHash,
 	})
+
+	log.Info("TxPool.AddMevBundle",
+		"txs", len(txs),
+		"bundleHash", bundleHash,
+		"blockNumber", blockNumber.String(),
+		"signingAddress", signingAddress.Hex(),
+		"minTimestamp", minTimestamp,
+		"maxTimestamp", maxTimestamp,
+		"revertingTxHashes", len(revertingTxHashes))
 	return nil
 }
 
