@@ -741,6 +741,7 @@ func (pool *TxPool) AddMevBundle(txs types.Transactions, blockNumber *big.Int, r
 	})
 
 	log.Info("TxPool.AddMevBundle",
+		"mevBundles", len(pool.mevBundles),
 		"txs", len(txs),
 		"bundleHash", bundleHash,
 		"blockNumber", blockNumber.String(),
